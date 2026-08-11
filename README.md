@@ -18,6 +18,20 @@ https://github.com/sjhdeux0114/UnityUtilScripts.git?path=/Assets/Util
 
 ---
 
+## ⚠️ 필수 프로젝트 설정 (Required Project Settings)
+
+> [!IMPORTANT]
+> **API Compatibility Level 설정**  
+> 유니티 기본 설정인 `.NET Standard 2.1` 환경에서는 라이브러리 및 플러그인 호환성 오류가 발생할 수 있습니다.  
+> 반드시 프로젝트 설정에서 **API Compatibility Level**을 **`.NET Framework`**로 변경해 주세요.
+>
+> **설정 방법:**
+> 1. Unity Editor 상단 메뉴: **`Edit` → `Project Settings...`** 선택
+> 2. **`Player`** 탭 → **`Other Settings`** 섹션 이동
+> 3. **`Configuration`** 그룹 내 **`Api Compatibility Level`**을 **`.NET Framework`** (또는 `.NET Framework 4.x`)로 변경
+
+---
+
 ## ✨ 주요 기능 (Key Features)
 
 ### 1. 🎬 Animation & Sprite
