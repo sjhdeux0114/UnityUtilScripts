@@ -1,0 +1,11 @@
+{
+  "name": "com.sjh.unityutilscripts",
+  "version": "1.0.0",
+  "displayName": "Unity Util Scripts",
+  "description": "Collection of Unity utility scripts and editor tools.",
+  "unity": "2021.3",
+  "author": {
+    "name": "sjhdeux0114",
+    "url": "https://github.com/sjhdeux0114"
+  }
+}
