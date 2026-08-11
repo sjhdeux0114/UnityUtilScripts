@@ -1,4 +1,5 @@
-﻿using UnityEngine;
+#if UNITY_EDITOR
+using UnityEngine;
 using UnityEngine.UI;
 using UnityEditor;
 using UITween;
@@ -321,7 +322,7 @@ public class EditorUITween : Editor
 			
 			EditorGUILayout.Space ();
 		}
-		
-		EditorGUILayout.EndToggleGroup ();
+				EditorGUILayout.EndToggleGroup ();
 	}
 }
+#endif

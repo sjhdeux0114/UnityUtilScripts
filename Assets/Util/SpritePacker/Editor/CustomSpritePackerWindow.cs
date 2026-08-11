@@ -1,3 +1,4 @@
+#if UNITY_EDITOR
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -535,3 +536,4 @@ public class CustomSpritePackerWindow : EditorWindow
         Debug.Log($"아틀라스 '{atlasTex.name}'에서 {metaInfoList.Count}개의 스프라이트를 추출하여 목록에 추가했습니다.");
     }
 }
+#endif
