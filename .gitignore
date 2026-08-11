@@ -8,12 +8,19 @@
 /[Uu]ser[Ss]ettings/
 /[Mm]emoryCaptures/
 /[Rr]ecordings/
+.utmp/
+*.log
 
 # Visual Studio / IDE temporary files
 .vs/
 .idea/
+.gradle/
+ExportedObj/
+.consulo/
 *.csproj
+*.unityproj
 *.sln
+*.slnx
 *.suo
 *.user
 *.userprefs
@@ -21,9 +28,41 @@
 *.booproj
 *.svd
 *.pdb
+*.mdb
 *.opendb
 *.VC.db
+
+# Unity3D generated meta files
+*.pidb.meta
+*.pdb.meta
+*.mdb.meta
 
 # OS generated files
 .DS_Store
 Thumbs.db
+
+# Unity crash / builds / auto-generated
+sysinfo.txt
+mono_crash.*
+*.apk
+*.aab
+*.unitypackage
+*.unitypackage.meta
+*.app
+crashlytics-build.properties
+InitTestScene*.unity*
+
+# Addressables
+/ServerData
+/[Aa]ssets/StreamingAssets/aa*
+/[Aa]ssets/AddressableAssetsData/link.xml*
+/[Aa]ssets/Addressables_Temp*
+/[Aa]ssets/AddressableAssetsData/*/*.bin*
+
+# Visual Scripting auto-generated files
+/[Aa]ssets/Unity.VisualScripting.Generated/VisualScripting.Flow/UnitOptions.db
+/[Aa]ssets/Unity.VisualScripting.Generated/VisualScripting.Flow/UnitOptions.db.meta
+/[Aa]ssets/Unity.VisualScripting.Generated/VisualScripting.Core/Property Providers
+/[Aa]ssets/Unity.VisualScripting.Generated/VisualScripting.Core/Property Providers.meta
+/[Aa]ssets/[Ii]nit[Tt]est[Ss]cene*.unity*
+/[Aa]ssets/[Ss]ceneDependencyCache*
