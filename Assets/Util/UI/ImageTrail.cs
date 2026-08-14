@@ -159,4 +159,21 @@ public class ImageTrail : MonoBehaviour
             prevScale = currentScale;
         }
     }
+
+    private void OnDisable()
+    {
+        for (int i = 0; i < imgList.Count; i++)
+        {
+            imgList[i].enabled = false;
+        }
+    }
+    private void OnEnable()
+    {
+        for (int i = 0; i < imgList.Count; i++)
+        {
+            imgList[i].enabled = true;
+            SetupTrailImage(imgList[i], i);
+        }
+    }
+
 }
