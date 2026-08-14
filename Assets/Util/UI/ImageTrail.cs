@@ -16,7 +16,7 @@ public class ImageTrail : MonoBehaviour
     private RectTransform targetRect;
     bool bInit = false;
 
-    private void OnEnable()
+    private void Awake()
     {
         if (!bInit)
             InitSetup();
@@ -93,11 +93,7 @@ public class ImageTrail : MonoBehaviour
             img.type = targetImage.type;
             img.preserveAspect = targetImage.preserveAspect;
 
-            // 순서에 따른 투명도(Alpha) 페이딩 효과 적용
-            Color col = targetImage.color;
-            float alphaFactor = 1f - ((float)(index + 1) / (TrailCount + 1));
-            col.a *= alphaFactor;
-            img.color = col;
+
         }
 
         img.raycastTarget = false;
@@ -150,6 +146,13 @@ public class ImageTrail : MonoBehaviour
             img.transform.position = Vector3.Lerp(currentPos, prevPos, t);
             img.transform.rotation = Quaternion.Lerp(currentRot, prevRot, t);
             img.transform.localScale = Vector3.Lerp(currentScale, prevScale, t);
+            // 순서에 따른 투명도(Alpha) 페이딩 효과 적용
+            Color col = targetImage.color;
+            float alphaFactor = 1f - ((float)(i + 1) / (TrailCount + 1));
+            col.a *= alphaFactor;
+            img.color = col;
+
+
 
             prevPos = currentPos;
             prevRot = currentRot;
