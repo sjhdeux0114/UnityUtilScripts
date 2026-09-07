@@ -66,6 +66,7 @@ public class SpriteGroupAnimator : MonoBehaviour, IMeshModifier
     [Header("Renderers")]
     public SpriteRenderer spriteRenderer;
     public Image uiImage;
+    public RawImage uiRawImage;
 
     [Header("Animations")]
     public List<SpriteGroupState> animations = new List<SpriteGroupState>();
@@ -87,12 +88,14 @@ public class SpriteGroupAnimator : MonoBehaviour, IMeshModifier
     private bool isPingPongForward = true;
     private Coroutine transitionCoroutine;
     private HashSet<SpriteGroupEvent> triggeredEvents = new HashSet<SpriteGroupEvent>();
+    public UnityAction Act_AniEnd;
 
     private void Awake()
     {
         // 렌더러 자동 할당
         if (spriteRenderer == null) spriteRenderer = GetComponent<SpriteRenderer>();
         if (uiImage == null) uiImage = GetComponent<Image>();
+        if (uiRawImage == null) uiRawImage = GetComponent<RawImage>();
     }
 
     private void Start()
@@ -111,6 +114,10 @@ public class SpriteGroupAnimator : MonoBehaviour, IMeshModifier
             {
                 uiImage.color = Color.white;
             }
+            if (uiRawImage != null)
+            {
+                uiRawImage.color = Color.white;
+            }
             if (spriteRenderer != null)
             {
                 spriteRenderer.color = Color.white;
@@ -120,6 +127,10 @@ public class SpriteGroupAnimator : MonoBehaviour, IMeshModifier
         {
             uiImage.SetVerticesDirty();
         }
+        if (uiRawImage != null)
+        {
+            uiRawImage.SetVerticesDirty();
+        }
     }
 
     private void OnDisable()
@@ -127,6 +138,10 @@ public class SpriteGroupAnimator : MonoBehaviour, IMeshModifier
         if (uiImage != null)
         {
             uiImage.SetVerticesDirty();
+        }
+        if (uiRawImage != null)
+        {
+            uiRawImage.SetVerticesDirty();
         }
     }
     private void Update()
@@ -202,6 +217,10 @@ public class SpriteGroupAnimator : MonoBehaviour, IMeshModifier
             {
                 uiImage.SetVerticesDirty();
             }
+            if (uiRawImage != null)
+            {
+                uiRawImage.SetVerticesDirty();
+            }
         }
 
         frameTimer = 0f;
@@ -243,6 +262,10 @@ public class SpriteGroupAnimator : MonoBehaviour, IMeshModifier
         {
             StopCoroutine(transitionCoroutine);
             transitionCoroutine = null;
+        }
+        else
+        {
+            Act_AniEnd?.Invoke();
         }
     }
 
@@ -360,6 +383,15 @@ public class SpriteGroupAnimator : MonoBehaviour, IMeshModifier
         {
             uiImage.sprite = sprite;
         }
+        if (uiRawImage != null)
+        {
+            uiRawImage.texture = sprite.texture;
+            if (sprite.texture != null)
+            {
+                //Rect r = sprite.textureRect;
+                //uiRawImage.uvRect = new UnityEngine.Rect(r.x / sprite.texture.width, r.y / sprite.texture.height, r.width / sprite.texture.width, r.height / sprite.texture.height);
+            }
+        }
 
         CheckFrameEvents();
     }
@@ -467,6 +499,8 @@ public class SpriteGroupAnimator : MonoBehaviour, IMeshModifier
                 spriteRenderer.color = OldColor;
             else if (uiImage != null)
                 uiImage.color = OldColor;
+            else if (uiRawImage != null)
+                uiRawImage.color = OldColor;
             IsFadeOut = false;
         }
     }
@@ -478,6 +512,8 @@ public class SpriteGroupAnimator : MonoBehaviour, IMeshModifier
             OldColor = spriteRenderer.color;
         else if (uiImage != null)
             OldColor = uiImage.color;
+        else if (uiRawImage != null)
+            OldColor = uiRawImage.color;
 
         float time = 0;
         while (time < FadeOutTime)
@@ -492,6 +528,10 @@ public class SpriteGroupAnimator : MonoBehaviour, IMeshModifier
             if (uiImage != null)
             {
                 uiImage.color = new Color(1f, 1f, 1f, 1f - t);
+            }
+            if (uiRawImage != null)
+            {
+                uiRawImage.color = new Color(1f, 1f, 1f, 1f - t);
             }
             yield return null;
         }
@@ -510,7 +550,7 @@ public class SpriteGroupAnimator : MonoBehaviour, IMeshModifier
 
     public void ModifyMesh(VertexHelper vh)
     {
-        if (!enabled || uiImage == null) return;
+        if (!enabled || (uiImage == null && uiRawImage == null)) return;
 
         int count = vh.currentVertCount;
         if (count == 0) return;
@@ -518,7 +558,7 @@ public class SpriteGroupAnimator : MonoBehaviour, IMeshModifier
         var verts = new List<UIVertex>();
         vh.GetUIVertexStream(verts);
 
-        Rect rect = uiImage.rectTransform.rect;
+        Rect rect = uiImage != null ? uiImage.rectTransform.rect : uiRawImage.rectTransform.rect;
         float centerX = (rect.xMin + rect.xMax) * 0.5f;
         float centerY = (rect.yMin + rect.yMax) * 0.5f;
 
@@ -551,6 +591,7 @@ public class SpriteGroupAnimator : MonoBehaviour, IMeshModifier
     {
         if (spriteRenderer == null) spriteRenderer = GetComponent<SpriteRenderer>();
         if (uiImage == null) uiImage = GetComponent<Image>();
+        if (uiRawImage == null) uiRawImage = GetComponent<RawImage>();
     }
 
     private void OnValidate()
