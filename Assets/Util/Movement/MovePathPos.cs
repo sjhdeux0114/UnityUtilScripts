@@ -1,4 +1,4 @@
-﻿using System.Collections;
+using System.Collections;
 using System.Collections.Generic;
 using System.IO;
 using UnityEngine;
@@ -9,6 +9,12 @@ public enum CMOVE_TYPE
     TOTAL = 0,
     ONE_PATH,
 }
+public enum CLINE_TYPE
+{
+    LINE = 0,
+    BEZIER,
+}
+
 
 
 [System.Serializable]
@@ -19,6 +25,15 @@ public class CMovePath
     public Vector3 Rotation;
     public float Speed = 1.0f;
     public AnimationCurve Curve;
+    [Range(-180f, 180f)] public float angle = 0f;
+    public float strength = 2f;
+    public bool bCustomBezier = false;
+    public Vector3 Tangent = Vector3.zero;
+
+    public Vector3 GetTangent()
+    {
+        return Quaternion.Euler(0, 0, angle) * Vector3.right;
+    }
 
     public CMovePath(CMovePath src)
     {
@@ -30,13 +45,22 @@ public class CMovePath
             Curve = new AnimationCurve();
             Curve.AddKey(new Keyframe(0, 0));
             Curve.AddKey(new Keyframe(1, 1));
+            angle = 0f;
+            strength = 2f;
+            bCustomBezier = false;
+            Tangent = Vector3.zero;
         }
         else
         {
             Pos = src.Pos;
             Scale = src.Scale;
             Rotation = src.Rotation;
-
+            Speed = src.Speed;
+            Curve = src.Curve != null ? new AnimationCurve(src.Curve.keys) : new AnimationCurve();
+            angle = src.angle;
+            strength = src.strength;
+            bCustomBezier = src.bCustomBezier;
+            Tangent = src.Tangent;
         }
     }
 
@@ -44,6 +68,7 @@ public class CMovePath
 public class MovePathPos : MonoBehaviour
 {
     public CMOVE_TYPE PathMode = CMOVE_TYPE.TOTAL;
+    public CLINE_TYPE LineMode = CLINE_TYPE.LINE;
     public List<CMovePath> TargetPoints = new List<CMovePath>();
     public bool bLocal;
     float fSpeed;
@@ -181,7 +206,15 @@ public class MovePathPos : MonoBehaviour
                                 Quaternion endSegmentRot = Quaternion.Euler(TargetPoints[i + 1].Rotation);
 
                                 float ret_t = TargetPoints[i].Curve.Evaluate(t);
-                                finalPos = Vector3.LerpUnclamped(startSegment, endSegment, ret_t);
+                                if (LineMode == CLINE_TYPE.BEZIER)
+                                {
+                                    GetBezierControlPoints(i, out Vector3 c1, out Vector3 c2);
+                                    finalPos = GetBezierPoint(startSegment, c1, c2, endSegment, ret_t);
+                                }
+                                else
+                                {
+                                    finalPos = Vector3.LerpUnclamped(startSegment, endSegment, ret_t);
+                                }
 
                                 // 🔒 Lock 적용
                                 if (Lock_X) finalPos.x = bLocal ? transform.localPosition.x : transform.position.x;
@@ -237,12 +270,24 @@ public class MovePathPos : MonoBehaviour
                         Quaternion startSegmentRot = Quaternion.Euler(TargetPoints[currentPointIndex].Rotation);
                         Quaternion endSegmentRot = Quaternion.Euler(TargetPoints[currentPointIndex + 1].Rotation);
 
-                        float segmentDistance = Vector3.Distance(startSegment, endSegment);
+                        float segmentDistance = (LineMode == CLINE_TYPE.BEZIER)
+                            ? GetBezierSegmentLength(currentPointIndex)
+                            : Vector3.Distance(startSegment, endSegment);
+                        if (segmentDistance <= 0.0001f) segmentDistance = 0.0001f;
+
                         float t = currentDistance / segmentDistance;
                         float ret_t = TargetPoints[currentPointIndex].Curve.Evaluate(t);
 
+                        if (LineMode == CLINE_TYPE.BEZIER)
+                        {
+                            GetBezierControlPoints(currentPointIndex, out Vector3 c1, out Vector3 c2);
+                            finalPos = GetBezierPoint(startSegment, c1, c2, endSegment, ret_t);
+                        }
+                        else
+                        {
+                            finalPos = Vector3.LerpUnclamped(startSegment, endSegment, ret_t);
+                        }
 
-                        finalPos = Vector3.LerpUnclamped(startSegment, endSegment, ret_t);
                         // 🔒 Lock 적용
                         if (Lock_X) finalPos.x = bLocal ? transform.localPosition.x : transform.position.x;
                         if (Lock_Y) finalPos.y = bLocal ? transform.localPosition.y : transform.position.y;
@@ -425,27 +470,33 @@ public class MovePathPos : MonoBehaviour
 
         if (PathMode == CMOVE_TYPE.TOTAL)
         {
-
             for (int i = 0; i < TargetPoints.Count - 1; i++)
             {
-                Vector3 currentPos = TargetPoints[i].Pos + Rnd_Pos;
-                Vector3 nextPos = TargetPoints[i + 1].Pos + Rnd_Pos;
-                totalPathDistance += Vector3.Distance(currentPos, nextPos);
+                if (LineMode == CLINE_TYPE.BEZIER)
+                {
+                    totalPathDistance += GetBezierSegmentLength(i);
+                }
+                else
+                {
+                    Vector3 currentPos = TargetPoints[i].Pos + Rnd_Pos;
+                    Vector3 nextPos = TargetPoints[i + 1].Pos + Rnd_Pos;
+                    totalPathDistance += Vector3.Distance(currentPos, nextPos);
+                }
             }
         }
         else
         {
-
-            Vector3 currentPos = TargetPoints[n].Pos + Rnd_Pos;
-            Vector3 nextPos = TargetPoints[n + 1].Pos + Rnd_Pos;
-            totalPathDistance = Vector3.Distance(currentPos, nextPos);
-
+            if (LineMode == CLINE_TYPE.BEZIER)
+            {
+                totalPathDistance = GetBezierSegmentLength(n);
+            }
+            else
+            {
+                Vector3 currentPos = TargetPoints[n].Pos + Rnd_Pos;
+                Vector3 nextPos = TargetPoints[n + 1].Pos + Rnd_Pos;
+                totalPathDistance = Vector3.Distance(currentPos, nextPos);
+            }
         }
-
-
-
-
-
 
         isPlaying = true;
         NowSegment = n;
@@ -453,13 +504,123 @@ public class MovePathPos : MonoBehaviour
         if (Act_Start != null)
         {
             Act_Start.Invoke(NowSegment);
-
         }
 
         _Update(0);
-
-
     }
+
+    #region Bezier Helpers
+
+    public static Vector3 GetBezierPoint(Vector3 p0, Vector3 p1, Vector3 p2, Vector3 p3, float t)
+    {
+        float u = 1f - t;
+        float tt = t * t;
+        float uu = u * u;
+        float uuu = uu * u;
+        float ttt = tt * t;
+        return uuu * p0 + 3f * uu * t * p1 + 3f * u * tt * p2 + ttt * p3;
+    }
+
+    public Vector3 GetEffectiveTangent(int index)
+    {
+        if (TargetPoints == null || index < 0 || index >= TargetPoints.Count)
+            return Vector3.zero;
+
+        CMovePath pt = TargetPoints[index];
+        if (pt.bCustomBezier)
+        {
+            return pt.GetTangent() * pt.strength;
+        }
+
+        if (pt.Tangent != Vector3.zero)
+        {
+            return pt.Tangent;
+        }
+
+        // Auto tangent
+        Vector3 pStart = pt.Pos + Rnd_Pos;
+        Vector3 pPrev;
+        if (index > 0)
+        {
+            pPrev = TargetPoints[index - 1].Pos + Rnd_Pos;
+        }
+        else if (bLoop && TargetPoints.Count > 2)
+        {
+            pPrev = TargetPoints[TargetPoints.Count - 2].Pos + Rnd_Pos;
+        }
+        else
+        {
+            Vector3 pNextRef = (index + 1 < TargetPoints.Count) ? TargetPoints[index + 1].Pos + Rnd_Pos : pStart + Vector3.right;
+            pPrev = pStart - (pNextRef - pStart);
+        }
+
+        Vector3 pNext;
+        if (index + 1 < TargetPoints.Count)
+        {
+            pNext = TargetPoints[index + 1].Pos + Rnd_Pos;
+        }
+        else if (bLoop && TargetPoints.Count > 2)
+        {
+            pNext = TargetPoints[1].Pos + Rnd_Pos;
+        }
+        else
+        {
+            pNext = pStart + (pStart - pPrev);
+        }
+
+        Vector3 t = (pNext - pPrev) * 0.5f;
+        return t / 3f;
+    }
+
+    public void GetBezierControlPoints(int index, out Vector3 c1, out Vector3 c2)
+    {
+        if (TargetPoints == null || index < 0 || index >= TargetPoints.Count - 1)
+        {
+            c1 = Vector3.zero;
+            c2 = Vector3.zero;
+            return;
+        }
+
+        Vector3 pStart = TargetPoints[index].Pos + Rnd_Pos;
+        Vector3 pEnd = TargetPoints[index + 1].Pos + Rnd_Pos;
+
+        c1 = pStart + GetEffectiveTangent(index);
+        c2 = pEnd - GetEffectiveTangent(index + 1);
+    }
+
+    public float GetBezierSegmentLength(int index, int samples = 15)
+    {
+        if (TargetPoints == null || index < 0 || index >= TargetPoints.Count - 1) return 0f;
+
+        GetBezierControlPoints(index, out Vector3 c1, out Vector3 c2);
+        Vector3 pStart = TargetPoints[index].Pos + Rnd_Pos;
+        Vector3 pEnd = TargetPoints[index + 1].Pos + Rnd_Pos;
+
+        float length = 0f;
+        Vector3 prev = pStart;
+        for (int i = 1; i <= samples; i++)
+        {
+            float t = i / (float)samples;
+            Vector3 pt = GetBezierPoint(pStart, c1, c2, pEnd, t);
+            length += Vector3.Distance(prev, pt);
+            prev = pt;
+        }
+        return length;
+    }
+
+    private Vector3 ToWorldGizmoPos(Vector3 pos)
+    {
+        if (bLocal)
+        {
+            if (transform.parent != null)
+                return transform.parent.TransformPoint(pos);
+            else
+                return transform.TransformPoint(pos);
+        }
+        return pos;
+    }
+
+    #endregion
 
     private void OnDrawGizmos()
     {
@@ -469,31 +630,50 @@ public class MovePathPos : MonoBehaviour
 
         for (int i = 0; i < TargetPoints.Count; i++)
         {
-            Vector3 worldPos;
-            if (bLocal)
-            {
-                // 부모 RectTransform을 기준으로 월드 변환
-                if (transform.parent != null)
-                    worldPos = transform.parent.TransformPoint(TargetPoints[i].Pos);
-                else
-                    worldPos = transform.TransformPoint(TargetPoints[i].Pos);
-            }
-            else
-            {
-                worldPos = TargetPoints[i].Pos;
-            }
-
-            // 1. 반지름 확인: 0.05는 픽셀 단위에서 너무 작습니다. 
-            // 최소 10~30 픽셀은 되어야 보입니다.
+            Vector3 worldPos = ToWorldGizmoPos(TargetPoints[i].Pos);
             float radius = GizmoRadius;
-
-
             Gizmos.DrawSphere(worldPos, radius);
 
 #if UNITY_EDITOR
-            // 2. 숫자로 인덱스 표시 (좌표 확인용)
-            UnityEditor.Handles.Label(worldPos, $"  Point {i}\n  ({TargetPoints[i].Pos.x}, {TargetPoints[i].Pos.y})");
+            // 오브젝트가 선택되지 않은 상태에서만 기즈모 라벨 표시 (선택 시에는 MovePathPosEditor의 인터랙티브 UI 표시)
+            if (UnityEditor.Selection.activeGameObject != gameObject)
+            {
+                UnityEditor.Handles.Label(worldPos, $"  Point {i}");
+            }
 #endif
+        }
+
+        // 경로 선 그리기
+        if (TargetPoints.Count > 1)
+        {
+            Gizmos.color = Color_Gizmo;
+            if (LineMode == CLINE_TYPE.BEZIER)
+            {
+                for (int i = 0; i < TargetPoints.Count - 1; i++)
+                {
+                    GetBezierControlPoints(i, out Vector3 c1, out Vector3 c2);
+                    Vector3 p0 = ToWorldGizmoPos(TargetPoints[i].Pos);
+                    Vector3 p1 = ToWorldGizmoPos(c1);
+                    Vector3 p2 = ToWorldGizmoPos(c2);
+                    Vector3 p3 = ToWorldGizmoPos(TargetPoints[i + 1].Pos);
+
+                    Vector3 prev = p0;
+                    for (int s = 1; s <= 20; s++)
+                    {
+                        float t = s / 20f;
+                        Vector3 current = GetBezierPoint(p0, p1, p2, p3, t);
+                        Gizmos.DrawLine(prev, current);
+                        prev = current;
+                    }
+                }
+            }
+            else
+            {
+                for (int i = 0; i < TargetPoints.Count - 1; i++)
+                {
+                    Gizmos.DrawLine(ToWorldGizmoPos(TargetPoints[i].Pos), ToWorldGizmoPos(TargetPoints[i + 1].Pos));
+                }
+            }
         }
     }
 
