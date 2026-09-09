@@ -9,7 +9,7 @@ public class AudioClipDrawer : PropertyDrawer
     private const float ButtonWidth = 24f;
     private const float ButtonHeight = 18f;
     private const float Gap = 4f;
-    private const float TimeWidth = 32f;
+    private const float TimeWidth = 38f;
     private const float MinVolumeWidth = 70f;
     private const float MinRowWidth = 220f;
 
@@ -50,6 +50,9 @@ public class AudioClipDrawer : PropertyDrawer
 
     private static void DrawPreviewControls(Rect position, float lineHeight, AudioClip clip, SerializedProperty volProp)
     {
+        int savedIndent = EditorGUI.indentLevel;
+        EditorGUI.indentLevel = 0;
+
         float rowX = position.x + EditorGUIUtility.labelWidth;
         float rowWidth = position.width - EditorGUIUtility.labelWidth;
 
@@ -87,10 +90,10 @@ public class AudioClipDrawer : PropertyDrawer
         float volumeWidth = Mathf.Max(MinVolumeWidth, rowRect.xMax - volumeX);
         Rect volumeRect = new Rect(volumeX, rowRect.y, volumeWidth, ButtonHeight);
 
-        float inputFieldWidth = 35f; // Set custom narrow width for input field (fits 100 or 1.0)
+        float inputFieldWidth = 42f; // Set custom width for input field (fits 100 or 1.0)
         float sliderBarWidth = volumeWidth - inputFieldWidth - Gap;
         Rect sliderBarRect = new Rect(volumeRect.x, volumeRect.y, sliderBarWidth, volumeRect.height);
-        Rect inputFieldRect = new Rect(sliderBarRect.xMax, volumeRect.y, inputFieldWidth, volumeRect.height);
+        Rect inputFieldRect = new Rect(sliderBarRect.xMax + Gap, volumeRect.y, inputFieldWidth, volumeRect.height);
 
         EditorGUI.BeginChangeCheck();
         if (volProp != null)
@@ -152,6 +155,8 @@ public class AudioClipDrawer : PropertyDrawer
                 AudioPreviewer.Volume = finalVal;
             }
         }
+
+        EditorGUI.indentLevel = savedIndent;
     }
 }
 #endif
