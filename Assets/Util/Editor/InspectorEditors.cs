@@ -21,7 +21,10 @@ public class TabbedEditor : Editor
 
     private void OnDisable()
     {
-        if (target != null) PlayerPrefs.SetInt($"Tab_{target.GetInstanceID()}", _selectedTabIndex);
+        if (target != null && _layout != null && _layout.HasCustomLayout && _layout.TabNames.Count > 1)
+        {
+            PlayerPrefs.SetInt($"Tab_{target.GetInstanceID()}", _selectedTabIndex);
+        }
     }
 
     public override void OnInspectorGUI()
@@ -43,6 +46,8 @@ public class TabbedEditor : Editor
             GUI.enabled = true;
         }
 
+        EditorGUI.BeginChangeCheck();
+
         if (_layout.HasCustomLayout)
         {
             InspectorDrawer.DrawLayout(serializedObject, _layout, ref _selectedTabIndex);
@@ -52,8 +57,12 @@ public class TabbedEditor : Editor
             DrawPropertiesExcluding(serializedObject, "m_Script");
         }
 
+        if (EditorGUI.EndChangeCheck())
+        {
+            serializedObject.ApplyModifiedProperties();
+        }
+
         InspectorDrawer.DrawButtons(targets, _layout.Buttons);
-        serializedObject.ApplyModifiedProperties();
     }
 }
 

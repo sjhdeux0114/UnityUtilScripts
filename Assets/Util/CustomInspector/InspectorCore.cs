@@ -113,7 +113,7 @@ public static class InspectorParser
 
             // AssetList (자동 인식 포함)
             var assetListAttr = fi.GetCustomAttribute<AssetListAttribute>();
-
+            var viewerAttr = fi.GetCustomAttribute<ViewerAttribute>();
 
             if (inlineAttr != null || requiredAttr != null || dropdownAttr != null ||
                 showIfAttr != null || readOnlyAttr != null || minMaxAttr != null ||
@@ -122,28 +122,25 @@ public static class InspectorParser
                 suffixAttr != null || titleAttr != null || assetsOnlyAttr != null || sceneOnlyAttr != null ||
                 animParamAttr != null || inputAxisAttr != null || folderPathAttr != null ||
                 findChildAttr != null || colorPresetAttr != null || onValueChangedAttr != null ||
-                assetListAttr != null)
+                assetListAttr != null || viewerAttr != null)
                 data.HasCustomLayout = true;
 
 
-            // GameObject 자동 Required 처리
+            // GameObject 자동 Required 처리 (명시적 속성이 사용될 때 유효)
             if (requiredAttr == null &&
                 (checkType == typeof(GameObject) || checkType == typeof(Text) || checkType == typeof(Image)) &&
                 optionalAttr == null)
             {
                 requiredAttr = new RequiredAttribute("GameObject must be assigned!");
-                data.HasCustomLayout = true;
             }
 
-            var viewer = checkType.GetCustomAttribute<ViewerAttribute>();
-            var noViewAttr = checkType.GetCustomAttribute<NoViewAttribute>();
-            bool isMediaType = checkType == typeof(Sprite) ||
-                               checkType == typeof(GameObject) || checkType == typeof(TextAsset);
+            var viewer = viewerAttr ?? checkType.GetCustomAttribute<ViewerAttribute>();
+            var noViewAttr = checkType.GetCustomAttribute<NoViewAttribute>() ?? fi.GetCustomAttribute<NoViewAttribute>();
+            bool isMediaType = checkType == typeof(Sprite) || checkType == typeof(Texture2D);
 
             if (viewer != null || (isMediaType && noViewAttr == null))
             {
                 if (viewer == null) viewer = new ViewerAttribute(100, 100);
-                data.HasCustomLayout = true;
             }
 
             if (!data.TabContents.ContainsKey(tab))
@@ -221,6 +218,7 @@ public static class InspectorDrawer
 
     private static string ValidateObject(SerializedProperty prop, AssetsOnlyAttribute assetsOnly, SceneObjectsOnlyAttribute sceneOnly)
     {
+        if (assetsOnly == null && sceneOnly == null) return null;
         if (prop.propertyType != SerializedPropertyType.ObjectReference || prop.objectReferenceValue == null) return null;
         bool isAsset = AssetDatabase.Contains(prop.objectReferenceValue);
         if (assetsOnly != null && !isAsset) return "Only assets (prefabs) allowed!";
@@ -360,7 +358,7 @@ public static class InspectorDrawer
                 }
                 else
                 {
-                    bool isTarget = prop.propertyType == SerializedPropertyType.ObjectReference || (prop.isArray && prop.propertyType != SerializedPropertyType.String);
+                    bool isTarget = prop.propertyType == SerializedPropertyType.ObjectReference && !prop.isArray;
                     if (field.Viewer != null && isTarget)
                     {
                         EditorGUILayout.BeginHorizontal();
