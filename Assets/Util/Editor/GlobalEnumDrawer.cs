@@ -9,6 +9,9 @@ using UnityEngine;
 [CustomPropertyDrawer(typeof(Enum), true)]
 public class GlobalEnumDrawer : PropertyDrawer
 {
+    private static readonly System.Collections.Generic.Dictionary<Type, string[]> _friendlyNamesCache = 
+        new System.Collections.Generic.Dictionary<Type, string[]>();
+
     public override void OnGUI(Rect position, SerializedProperty property, GUIContent label)
     {
         // 1. [Flags] 속성이 있는 Enum(중복 선택)은 기본 Unity 방식으로 그리기
@@ -23,7 +26,6 @@ public class GlobalEnumDrawer : PropertyDrawer
         position = EditorGUI.PrefixLabel(position, GUIUtility.GetControlID(FocusType.Passive), label);
 
         // 3. 현재 선택된 값 이름 가져오기
-        // (리스트 배열 내의 Enum 등에서 인덱스 오류 방지)
         string currentName = "Unknown";
         string[] displayNames = GetFriendlyNames(property);
         if (property.enumValueIndex >= 0 && property.enumValueIndex < displayNames.Length)
@@ -56,35 +58,50 @@ public class GlobalEnumDrawer : PropertyDrawer
 
     private string[] GetFriendlyNames(SerializedProperty property)
     {
+        Type enumType = GetEnumType();
+        if (enumType == null) return property.enumDisplayNames;
+
+        if (_friendlyNamesCache.TryGetValue(enumType, out var cached))
+            return cached;
+
         string[] enumNames = property.enumNames;
         if (enumNames == null) return property.enumDisplayNames;
 
+        // KeyCode 등 UnityEngine, System 내장 Enum은 EnumLabelAttribute가 있을 수 없으므로 리플렉션 완전 생략
+        bool isBuiltIn = enumType.Namespace != null && 
+                         (enumType.Namespace.StartsWith("UnityEngine") || enumType.Namespace.StartsWith("System"));
+
+        if (isBuiltIn)
+        {
+            string[] builtInNames = property.enumDisplayNames;
+            _friendlyNamesCache[enumType] = builtInNames;
+            return builtInNames;
+        }
+
         string[] displayNames = new string[enumNames.Length];
-        Type enumType = GetEnumType();
 
         for (int i = 0; i < enumNames.Length; i++)
         {
             displayNames[i] = property.enumDisplayNames[i]; // default fallback
-            if (enumType != null)
+            try
             {
-                try
+                var memberInfo = enumType.GetMember(enumNames[i]);
+                if (memberInfo != null && memberInfo.Length > 0)
                 {
-                    var memberInfo = enumType.GetMember(enumNames[i]);
-                    if (memberInfo != null && memberInfo.Length > 0)
+                    var attr = memberInfo[0].GetCustomAttribute<EnumLabelAttribute>();
+                    if (attr != null && !string.IsNullOrEmpty(attr.label))
                     {
-                        var attr = memberInfo[0].GetCustomAttribute<EnumLabelAttribute>();
-                        if (attr != null && !string.IsNullOrEmpty(attr.label))
-                        {
-                            displayNames[i] = attr.label;
-                        }
+                        displayNames[i] = attr.label;
                     }
                 }
-                catch
-                {
-                    // Fallback to default enum display name
-                }
+            }
+            catch
+            {
+                // Fallback to default enum display name
             }
         }
+
+        _friendlyNamesCache[enumType] = displayNames;
         return displayNames;
     }
 }
