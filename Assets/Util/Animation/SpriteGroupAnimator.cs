@@ -426,6 +426,7 @@ public class SpriteGroupAnimator : MonoBehaviour, IMeshModifier
         switch (currentState.endAction)
         {
             case SpriteGroupEndAction.None:
+                Act_AniEnd?.Invoke();
                 break;
 
             case SpriteGroupEndAction.Transition:
