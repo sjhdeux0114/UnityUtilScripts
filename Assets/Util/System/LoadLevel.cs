@@ -16,7 +16,7 @@ public class LoadLevel : MonoBehaviour
     {
         yield return new WaitForSeconds(0.5f);
         if(bWake)
-            SceneManager.LoadScene(Next_Scene_Number);
+            NextLevel();
     }
 
     // Update is called once per frame
@@ -25,7 +25,12 @@ public class LoadLevel : MonoBehaviour
         if(Input.GetKeyDown(NextKey))
         {
             _Event.Invoke();
-            SceneManager.LoadScene(Next_Scene_Number);
+            NextLevel();
         }
+    }
+
+    public void NextLevel()
+    {
+        SceneManager.LoadScene(Next_Scene_Number);
     }
 }
