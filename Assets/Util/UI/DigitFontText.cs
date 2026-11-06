@@ -116,6 +116,8 @@ public class DigitFontText : MonoBehaviour
             return;
         }
 
+        float FontSizePer = fontAsset.FontSize.y / fontAsset.FontSize.x;
+
         int valToDisplay = Mathf.RoundToInt(displayedValue);
         string str = zeroPadding ? valToDisplay.ToString($"D{padDigits}") : valToDisplay.ToString();
 
@@ -169,6 +171,7 @@ public class DigitFontText : MonoBehaviour
 
         // 두 번째 루프: 위치 배치
         float offset = startOffset;
+        float FontSizeH = FontSize * FontSizePer;
         for (int i = 0; i < str.Length; i++)
         {
             char c = str[i];
@@ -191,7 +194,8 @@ public class DigitFontText : MonoBehaviour
             RectTransform rt = digits[i].rectTransform;
             rt.anchorMin = rt.anchorMax = rt.pivot = new Vector2(0.5f, 0.5f);
             rt.anchoredPosition = new Vector2(offset, 0);
-            rt.sizeDelta = new Vector2(FontSize, FontSize);
+
+            rt.sizeDelta = new Vector2(FontSize, FontSizeH);
             offset += charSpacing;
 
             digits[i].gameObject.SetActive(true);
