@@ -28,11 +28,13 @@ public class AutoHide : MonoBehaviour
 
     private Vector3 startScale;
     private bool isStartScaleSaved = false;
+    public bool bPause;
 
     private Dictionary<Component, Color> initialColors = new Dictionary<Component, Color>();
 
     private void Awake()
     {
+
         if (!isStartScaleSaved)
         {
             startScale = transform.localScale;
@@ -42,6 +44,7 @@ public class AutoHide : MonoBehaviour
 
     private void OnEnable()
     {
+        bPause = false;
         if (bRandom)
         {
             Times = Random.Range(Random_Min, Random_Max);
@@ -131,6 +134,7 @@ public class AutoHide : MonoBehaviour
 
     void Update()
     {
+        if (bPause) return;
         timer += Time.deltaTime;
 
         float totalTime = Times;

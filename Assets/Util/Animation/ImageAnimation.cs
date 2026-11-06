@@ -40,6 +40,7 @@ public class ImageAnimation : MonoBehaviour
     float frameTime = 0;
     public bool bInit_Frame = false;
     public bool bUnscaled;
+    public bool bPause;
     // Use this for initialization
     void Start()
     {
@@ -87,6 +88,7 @@ public class ImageAnimation : MonoBehaviour
         else
             _img.enabled = true;
         bPlay = true;
+        bPause = false;
         frame = 0;
         fps_delay = 1.0f / _Fps;
         frameTime = Time.time;
@@ -141,6 +143,7 @@ public class ImageAnimation : MonoBehaviour
 
     public void _Update(float deltaTime)
     {
+        if (bPause) return;
         if (bPlay)
         {
             if (delayTime > 0)
@@ -288,7 +291,7 @@ public class ImageAnimation : MonoBehaviour
                 else if (_mode == IMAGE_ANI_PLAY_MODE._ONCE_HIDE)
                 {
                     bPlay = false;
-                    if(Application.isPlaying)
+                    if (Application.isPlaying)
                         gameObject.SetActive(false);
                     EndEvent.Invoke();
                 }

@@ -43,6 +43,9 @@ public static class SoundEventBus
     public static event Action OnResumeBGVol;
     public static void ResumeBGVol() => OnResumeBGVol?.Invoke();
 
+    public static event Func<AudioSource> GetAudioSource;
+    public static AudioSource GetBGSource() => GetAudioSource?.Invoke();
+
 
 
     // ==========================================

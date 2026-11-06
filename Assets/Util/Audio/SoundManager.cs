@@ -169,6 +169,7 @@ public class SoundManager : MonoBehaviour
         SoundEventBus.OnPauseSound += PauseSound;
         SoundEventBus.OnResumeSound += ResumeSound;
         SoundEventBus.OnStopEffectLoop += Play_Effect_StopLoop;
+        SoundEventBus.GetAudioSource += GetBGSource;
     }
 
     private void OnDisable()
@@ -200,6 +201,12 @@ public class SoundManager : MonoBehaviour
         SoundEventBus.OnPauseSound -= PauseSound;
         SoundEventBus.OnResumeSound -= ResumeSound;
         SoundEventBus.OnStopEffectLoop -= Play_Effect_StopLoop;
+        SoundEventBus.GetAudioSource -= GetBGSource;
+    }
+
+    private AudioSource GetBGSource()
+    {
+        return Audio_BG;
     }
 
     public void Sound_OnOff(float val)
