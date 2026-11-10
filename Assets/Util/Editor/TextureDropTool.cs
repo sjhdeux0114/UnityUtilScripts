@@ -12,14 +12,14 @@ public class TextureDropTool : EditorWindow
     private bool _sortByNaturalName = true;
     private bool _appendMode = false;
 
-    // 배열별 Foldout 상태 저장 (Key: InstanceID + PropertyPath)
+    // 접기/펼치기 상태 저장 (Key: InstanceID + Prefix + PropertyPath)
     private readonly Dictionary<string, bool> _foldoutStates = new Dictionary<string, bool>();
 
     [MenuItem("Tools/Texture Batch Dropper (텍스처 일괄 드롭)")]
     public static void ShowWindow()
     {
         var window = GetWindow<TextureDropTool>("Texture Dropper");
-        window.minSize = new Vector2(350, 420);
+        window.minSize = new Vector2(360, 450);
         window.Show();
     }
 
@@ -46,9 +46,8 @@ public class TextureDropTool : EditorWindow
         EditorGUILayout.HelpBox(
             "【사용 방법】\n" +
             "1. 대상 오브젝트를 지정합니다. (🔒 고정 가능)\n" +
-            "2. 작업할 배열의 ▶ 화살표를 눌러 펼칩니다.\n" +
-            "3. 프로젝트 창에서 파일들을 드래그하여 파란 드롭 박스에 넣으세요!\n" +
-            "   (Sprite 배열에 Texture를 넣어도 자동으로 Sprite를 찾아 등록합니다)",
+            "2. 작업할 최상위 배열(예: _BaseTexture)을 펼친 후 대상 슬롯에 드롭하세요!\n" +
+            "   (Sprite 슬롯에 Texture를 넣어도 자동으로 대응되는 Sprite를 찾아 등록합니다)",
             MessageType.Info);
 
         EditorGUILayout.Space(5);
@@ -56,18 +55,22 @@ public class TextureDropTool : EditorWindow
         // 옵션 툴바
         using (new EditorGUILayout.HorizontalScope(EditorStyles.toolbar))
         {
-            _sortByNaturalName = EditorGUILayout.ToggleLeft("01, 02... 자동 정렬", _sortByNaturalName, GUILayout.Width(130));
-            _appendMode = EditorGUILayout.ToggleLeft("뒤에 추가(Append)", _appendMode, GUILayout.Width(120));
+            _sortByNaturalName = EditorGUILayout.ToggleLeft("01, 02... 자동 정렬", _sortByNaturalName, GUILayout.Width(125));
+            _appendMode = EditorGUILayout.ToggleLeft("추가(Append)", _appendMode, GUILayout.Width(90));
 
             GUILayout.FlexibleSpace();
 
-            if (GUILayout.Button("모두 펼치기", EditorStyles.toolbarButton))
+            if (GUILayout.Button("대분류 펼치기", EditorStyles.toolbarButton))
             {
-                SetAllFoldouts(true);
+                SetFoldoutsByPrefix("_root_", true);
             }
-            if (GUILayout.Button("모두 접기", EditorStyles.toolbarButton))
+            if (GUILayout.Button("대분류 접기", EditorStyles.toolbarButton))
             {
-                SetAllFoldouts(false);
+                SetFoldoutsByPrefix("_root_", false);
+            }
+            if (GUILayout.Button("슬롯 모두 접기", EditorStyles.toolbarButton))
+            {
+                SetFoldoutsByPrefix("_slot_", false);
             }
         }
 
@@ -122,13 +125,63 @@ public class TextureDropTool : EditorWindow
 
             EditorGUILayout.BeginVertical(EditorStyles.helpBox);
             EditorGUILayout.LabelField($"컴포넌트: {comp.GetType().Name}", EditorStyles.boldLabel);
-            EditorGUILayout.Space(3);
+            EditorGUILayout.Space(4);
 
-            foreach (var prop in arrayProperties)
+            // 최상위 배열 필드명(예: _BaseTexture, _ShapeTexture 등)으로 그룹화
+            var rootGroups = arrayProperties
+                .GroupBy(p => GetRootPropertyName(p.propertyPath))
+                .ToList();
+
+            foreach (var group in rootGroups)
             {
-                DrawDropZone(comp, so, prop);
-                totalFoundSlots++;
-                EditorGUILayout.Space(2);
+                string rootName = group.Key;
+                string rootKey = $"{comp.GetInstanceID()}_root_{rootName}";
+                bool isRootExpanded = GetFoldoutState(rootKey, false);
+
+                // 최상위 프로퍼티(배열) 정보 조회
+                var rootProp = so.FindProperty(rootName);
+                string arrayCountInfo = (rootProp != null && rootProp.isArray) ? $" (크기: {rootProp.arraySize})" : "";
+
+                // 대분류 Foldout 헤더
+                EditorGUILayout.BeginVertical(EditorStyles.helpBox);
+
+                GUIStyle rootFoldoutStyle = new GUIStyle(EditorStyles.foldout)
+                {
+                    fontStyle = FontStyle.Bold,
+                    fontSize = 11
+                };
+
+                bool nextRootState = EditorGUILayout.Foldout(
+                    isRootExpanded,
+                    $"📂 {rootName}{arrayCountInfo}  [하위 슬롯 {group.Count()}개]",
+                    true,
+                    rootFoldoutStyle);
+
+                if (nextRootState != isRootExpanded)
+                {
+                    _foldoutStates[rootKey] = nextRootState;
+                    isRootExpanded = nextRootState;
+                }
+
+                // 대분류가 펼쳐져 있을 때만 하위 슬롯들 표시
+                if (isRootExpanded)
+                {
+                    EditorGUILayout.Space(3);
+                    EditorGUI.indentLevel++;
+
+                    foreach (var prop in group)
+                    {
+                        DrawDropZone(comp, so, prop, rootName);
+                        totalFoundSlots++;
+                        EditorGUILayout.Space(2);
+                    }
+
+                    EditorGUI.indentLevel--;
+                    EditorGUILayout.Space(2);
+                }
+
+                EditorGUILayout.EndVertical();
+                EditorGUILayout.Space(3);
             }
 
             EditorGUILayout.EndVertical();
@@ -143,9 +196,22 @@ public class TextureDropTool : EditorWindow
         EditorGUILayout.EndScrollView();
     }
 
-    private void SetAllFoldouts(bool state)
+    private string GetRootPropertyName(string propertyPath)
     {
-        var keys = _foldoutStates.Keys.ToList();
+        int dotIdx = propertyPath.IndexOf('.');
+        int bracketIdx = propertyPath.IndexOf('[');
+
+        int splitIdx = -1;
+        if (dotIdx >= 0 && bracketIdx >= 0) splitIdx = Mathf.Min(dotIdx, bracketIdx);
+        else if (dotIdx >= 0) splitIdx = dotIdx;
+        else if (bracketIdx >= 0) splitIdx = bracketIdx;
+
+        return splitIdx >= 0 ? propertyPath.Substring(0, splitIdx) : propertyPath;
+    }
+
+    private void SetFoldoutsByPrefix(string prefix, bool state)
+    {
+        var keys = _foldoutStates.Keys.Where(k => k.Contains(prefix)).ToList();
         foreach (var key in keys)
         {
             _foldoutStates[key] = state;
@@ -206,45 +272,46 @@ public class TextureDropTool : EditorWindow
         }
     }
 
-    private void DrawDropZone(MonoBehaviour comp, SerializedObject so, SerializedProperty arrayProp)
+    private void DrawDropZone(MonoBehaviour comp, SerializedObject so, SerializedProperty arrayProp, string rootName)
     {
-        string propPath = arrayProp.propertyPath.Replace(".Array.data[", "[").Replace("]", "]");
+        string fullPath = arrayProp.propertyPath.Replace(".Array.data[", "[").Replace("]", "]");
+
+        // 대분류 이름 뒤의 상대 경로만 깔끔하게 추출 (예: _BaseTexture[0]._Tex -> [0]._Tex)
+        string displayPath = fullPath.StartsWith(rootName) ? fullPath.Substring(rootName.Length).TrimStart('.') : fullPath;
+        if (string.IsNullOrEmpty(displayPath)) displayPath = fullPath;
+
         string elemTypeName = GetArrayElementTypeName(arrayProp);
         bool isSpriteArray = elemTypeName.Contains("Sprite");
         string typeLabel = isSpriteArray ? "Sprite" : "Texture";
 
-        string foldoutKey = $"{comp.GetInstanceID()}_{arrayProp.propertyPath}";
-        bool isExpanded = GetFoldoutState(foldoutKey, false);
+        string slotKey = $"{comp.GetInstanceID()}_slot_{arrayProp.propertyPath}";
+        bool isSlotExpanded = GetFoldoutState(slotKey, false);
 
-        // Foldout 헤더 디자인
         EditorGUILayout.BeginVertical(EditorStyles.helpBox);
 
         using (new EditorGUILayout.HorizontalScope())
         {
-            GUIStyle foldoutStyle = new GUIStyle(EditorStyles.foldout)
-            {
-                fontStyle = FontStyle.Bold
-            };
+            GUIStyle slotFoldoutStyle = new GUIStyle(EditorStyles.foldout);
 
-            bool nextState = EditorGUILayout.Foldout(
-                isExpanded,
-                $"{propPath}  [{typeLabel}]  (현재 {arrayProp.arraySize}개)",
+            bool nextSlotState = EditorGUILayout.Foldout(
+                isSlotExpanded,
+                $"{displayPath}  [{typeLabel}]  (현재 {arrayProp.arraySize}개)",
                 true,
-                foldoutStyle);
+                slotFoldoutStyle);
 
-            if (nextState != isExpanded)
+            if (nextSlotState != isSlotExpanded)
             {
-                _foldoutStates[foldoutKey] = nextState;
-                isExpanded = nextState;
+                _foldoutStates[slotKey] = nextSlotState;
+                isSlotExpanded = nextSlotState;
             }
         }
 
-        // 펼쳐져 있을 때만 드롭존 표시
-        if (isExpanded)
+        // 슬롯이 펼쳐졌을 때만 드롭존 박스 표시
+        if (isSlotExpanded)
         {
-            EditorGUILayout.Space(3);
+            EditorGUILayout.Space(2);
 
-            Rect dropRect = GUILayoutUtility.GetRect(0, 44, GUILayout.ExpandWidth(true));
+            Rect dropRect = GUILayoutUtility.GetRect(0, 40, GUILayout.ExpandWidth(true));
 
             Event evt = Event.current;
             bool isHovering = dropRect.Contains(evt.mousePosition);
@@ -255,7 +322,7 @@ public class TextureDropTool : EditorWindow
                 GUI.backgroundColor = new Color(0.4f, 0.8f, 1f, 1f);
             }
 
-            GUI.Box(dropRect, $"▼ 여기에 [{typeLabel}] 에셋들을 드래그 & 드롭하세요 ▼", EditorStyles.helpBox);
+            GUI.Box(dropRect, $"▼ 여기에 [{typeLabel}] 드래그 & 드롭 ▼", EditorStyles.helpBox);
             GUI.backgroundColor = originalColor;
 
             if (isHovering)
@@ -299,7 +366,7 @@ public class TextureDropTool : EditorWindow
                             so.ApplyModifiedProperties();
                             EditorUtility.SetDirty(comp);
 
-                            Debug.Log($"<color=cyan>[TextureDropTool]</color> '{comp.name}'의 <b>{propPath}</b>에 <b>{droppedObjects.Count}개</b> 중 <b>{successCount}개</b>의 에셋이 성공적으로 등록되었습니다!");
+                            Debug.Log($"<color=cyan>[TextureDropTool]</color> '{comp.name}'의 <b>{fullPath}</b>에 <b>{droppedObjects.Count}개</b> 중 <b>{successCount}개</b>의 에셋이 성공적으로 등록되었습니다!");
                         }
                         else
                         {
