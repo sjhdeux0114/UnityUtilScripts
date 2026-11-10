@@ -22,7 +22,6 @@ public class TextureDropTool : EditorWindow
 
     private void OnEnable()
     {
-        // 창이 열릴 때 현재 선택된 게임오브젝트가 있으면 기본 타깃으로 설정
         if (Selection.activeGameObject != null)
         {
             _targetObject = Selection.activeGameObject;
@@ -31,8 +30,6 @@ public class TextureDropTool : EditorWindow
 
     private void OnSelectionChange()
     {
-        // 고정(Lock) 상태가 아니고, 새로 선택한 것이 '게임오브젝트'일 때만 대상 변경
-        // (프로젝트 창에서 텍스처나 에셋을 선택했을 때는 기존 오브젝트 유지를 위해 풀리지 않음!)
         if (!_isLocked && Selection.activeGameObject != null)
         {
             _targetObject = Selection.activeGameObject;
@@ -46,8 +43,9 @@ public class TextureDropTool : EditorWindow
         EditorGUILayout.HelpBox(
             "【사용 방법】\n" +
             "1. 대상 오브젝트를 지정하거나 하이어라키에서 선택합니다. (🔒 고정 가능)\n" +
-            "2. 프로젝트 창에서 텍스처 파일들을 여러 개 선택합니다.\n" +
-            "3. 아래 원하는 배열 슬롯의 파란 박스로 마우스 드래그 & 드롭하세요!",
+            "2. 프로젝트 창에서 텍스처/스프라이트 파일들을 여러 개 선택합니다.\n" +
+            "3. 아래 원하는 배열 슬롯의 파란 박스로 마우스 드래그 & 드롭하세요!\n" +
+            "   (Sprite 배열에 Texture를 넣어도 자동으로 Sprite를 찾아 등록합니다)",
             MessageType.Info);
 
         EditorGUILayout.Space(5);
@@ -156,31 +154,34 @@ public class TextureDropTool : EditorWindow
 
     private bool IsTextureOrSpriteArray(SerializedProperty arrayProp)
     {
+        string elemType = GetArrayElementTypeName(arrayProp);
+        return elemType.Contains("Sprite") || elemType.Contains("Texture");
+    }
+
+    private string GetArrayElementTypeName(SerializedProperty arrayProp)
+    {
         if (arrayProp.arraySize > 0)
         {
-            var firstElem = arrayProp.GetArrayElementAtIndex(0);
-            if (firstElem.propertyType == SerializedPropertyType.ObjectReference)
-            {
-                return true;
-            }
+            return arrayProp.GetArrayElementAtIndex(0).type;
         }
         else
         {
             int oldSize = arrayProp.arraySize;
             arrayProp.arraySize = 1;
-            var elem = arrayProp.GetArrayElementAtIndex(0);
-            bool isObj = elem.propertyType == SerializedPropertyType.ObjectReference;
+            string type = arrayProp.GetArrayElementAtIndex(0).type;
             arrayProp.arraySize = oldSize;
-            return isObj;
+            return type;
         }
-
-        return false;
     }
 
     private void DrawDropZone(MonoBehaviour comp, SerializedObject so, SerializedProperty arrayProp)
     {
         string propPath = arrayProp.propertyPath.Replace(".Array.data[", "[").Replace("]", "]");
-        string labelText = $"{propPath} (현재 {arrayProp.arraySize}개)";
+        string elemTypeName = GetArrayElementTypeName(arrayProp);
+        bool isSpriteArray = elemTypeName.Contains("Sprite");
+        string typeLabel = isSpriteArray ? "Sprite" : "Texture";
+
+        string labelText = $"{propPath} [{typeLabel}] (현재 {arrayProp.arraySize}개)";
 
         Rect dropRect = GUILayoutUtility.GetRect(0, 48, GUILayout.ExpandWidth(true));
 
@@ -193,7 +194,7 @@ public class TextureDropTool : EditorWindow
             GUI.backgroundColor = new Color(0.4f, 0.8f, 1f, 1f);
         }
 
-        GUI.Box(dropRect, $"{labelText}\n▼ 여기에 텍스처들을 드래그 & 드롭하세요 ▼", EditorStyles.helpBox);
+        GUI.Box(dropRect, $"{labelText}\n▼ 여기에 에셋들을 드래그 & 드롭하세요 ▼", EditorStyles.helpBox);
         GUI.backgroundColor = originalColor;
 
         if (isHovering)
@@ -217,7 +218,7 @@ public class TextureDropTool : EditorWindow
 
                     if (droppedObjects.Count > 0)
                     {
-                        Undo.RecordObject(comp, "Batch Assign Textures");
+                        Undo.RecordObject(comp, "Batch Assign Textures/Sprites");
                         so.Update();
 
                         int startIndex = _appendMode ? arrayProp.arraySize : 0;
@@ -225,16 +226,19 @@ public class TextureDropTool : EditorWindow
 
                         arrayProp.arraySize = newSize;
 
+                        int successCount = 0;
                         for (int i = 0; i < droppedObjects.Count; i++)
                         {
                             var elem = arrayProp.GetArrayElementAtIndex(startIndex + i);
-                            elem.objectReferenceValue = droppedObjects[i];
+                            Object targetAsset = ConvertToAppropriateAsset(droppedObjects[i], isSpriteArray);
+                            elem.objectReferenceValue = targetAsset;
+                            if (targetAsset != null) successCount++;
                         }
 
                         so.ApplyModifiedProperties();
                         EditorUtility.SetDirty(comp);
 
-                        Debug.Log($"<color=cyan>[TextureDropTool]</color> '{comp.name}'의 <b>{propPath}</b>에 <b>{droppedObjects.Count}개</b>의 에셋이 등록되었습니다!");
+                        Debug.Log($"<color=cyan>[TextureDropTool]</color> '{comp.name}'의 <b>{propPath}</b>에 <b>{droppedObjects.Count}개</b> 중 <b>{successCount}개</b>의 에셋이 성공적으로 등록되었습니다!");
                     }
                     else
                     {
@@ -244,6 +248,54 @@ public class TextureDropTool : EditorWindow
                 evt.Use();
             }
         }
+    }
+
+    /// <summary>
+    /// 대상 배열 타입(Sprite vs Texture)에 맞게 에셋을 변환합니다.
+    /// </summary>
+    private Object ConvertToAppropriateAsset(Object source, bool isTargetSprite)
+    {
+        if (source == null) return null;
+
+        if (isTargetSprite)
+        {
+            // 대상이 Sprite인 경우
+            if (source is Sprite spr) return spr;
+            if (source is Texture2D tex) return GetSpriteFromTexture(tex);
+        }
+        else
+        {
+            // 대상이 Texture인 경우
+            if (source is Texture tex) return tex;
+            if (source is Sprite spr) return spr.texture;
+        }
+
+        return source;
+    }
+
+    /// <summary>
+    /// Texture2D로부터 대응되는 Sprite 에셋을 로드합니다 (Single 및 Multiple 모드 지원)
+    /// </summary>
+    private Sprite GetSpriteFromTexture(Texture2D texture)
+    {
+        string path = AssetDatabase.GetAssetPath(texture);
+        if (string.IsNullOrEmpty(path)) return null;
+
+        // 1. Single 모드 스프라이트 (메인 에셋으로 바로 로드)
+        var sprite = AssetDatabase.LoadAssetAtPath<Sprite>(path);
+        if (sprite != null) return sprite;
+
+        // 2. Multiple 모드이거나 서브에셋인 경우
+        var allSprites = AssetDatabase.LoadAllAssetsAtPath(path).OfType<Sprite>().ToArray();
+        if (allSprites.Length > 0)
+        {
+            // 텍스처 이름과 동일한 스프라이트를 우선 매칭, 없으면 첫 번째 스프라이트
+            var matched = allSprites.FirstOrDefault(s => s.name == texture.name);
+            return matched != null ? matched : allSprites[0];
+        }
+
+        Debug.LogWarning($"[TextureDropTool] '{texture.name}' 텍스처에서 Sprite를 찾을 수 없습니다. Texture Type이 'Sprite (2D and UI)'인지 확인해주세요.");
+        return null;
     }
 
     private class NaturalStringComparer : IComparer<string>
