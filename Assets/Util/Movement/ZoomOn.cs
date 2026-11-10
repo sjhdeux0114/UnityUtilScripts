@@ -12,7 +12,7 @@ public delegate void EndEvent();
 /// - 곡선(Curve/alpha)에 따라 Scale/Color/Move/Rotate를 애니메이션.
 /// - 지연 시작/자동 숨김/루프/역재생/로테이션 루프/사운드 호출 등 원본 기능 유지.
 /// - 외부에서 Play/PlayOnce/PlayBackward/Stop/_Reset/_Update 호출 패턴 그대로 사용.
-/// 
+///
 /// ⚠️주의:
 ///  - Org_Pos/Org_Rot은 local 기준으로 저장되지만, _Reset()에서는 transform.position(월드)와 EulerAngles(월드 로테이션)를 사용합니다. (원본 동작 보존)
 ///  - RotatePower != Vector3.zero && !bRotateLoop 시, Quaternion.Lerp(..., 1)은 사실상 TargetRot*p로 직접 설정하는 효과입니다. (원본 그대로 유지)
@@ -165,6 +165,7 @@ public class ZoomOn : MonoBehaviour
         // 시작 원점/회전(로컬) 저장
         Org_Pos = transform.localPosition - MovePower;
         Org_Rot = transform.localEulerAngles;
+        OrgScale = transform.localScale;
     }
 
     /// <summary>외부에서 색을 즉시 교체(렌더러 우선순위 동일)</summary>
